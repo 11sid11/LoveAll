@@ -22,14 +22,17 @@ export function celebratePoint(button, event) {
   if (prefersReducedMotion()) return;
 
   const rect = button.getBoundingClientRect();
-  const originX = rect.width > 0 ? event.clientX - rect.left : rect.width / 2;
-  const originY = rect.height > 0 ? event.clientY - rect.top : rect.height / 2;
+  const hasPointerPosition = Number.isFinite(event?.clientX)
+    && Number.isFinite(event?.clientY)
+    && (event.clientX !== 0 || event.clientY !== 0);
+  const originX = hasPointerPosition ? event.clientX - rect.left : rect.width / 2;
+  const originY = hasPointerPosition ? event.clientY - rect.top : rect.height / 2;
 
   for (const [dx, dy] of POINT_VECTORS) {
     const spark = document.createElement("span");
     spark.className = "point-spark";
-    spark.style.setProperty("--spark-x", `${originX}px`);
-    spark.style.setProperty("--spark-y", `${originY}px`);
+    spark.style.setProperty("--spark-x", `${clamp(originX, 0, rect.width)}px`);
+    spark.style.setProperty("--spark-y", `${clamp(originY, 0, rect.height)}px`);
     spark.style.setProperty("--spark-dx", `${dx}px`);
     spark.style.setProperty("--spark-dy", `${dy}px`);
     button.append(spark);
@@ -69,6 +72,10 @@ export function celebrateGame(container, winningSide) {
     container.replaceChildren();
     delete container.dataset.side;
   }, 1100);
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
 }
 
 function prefersReducedMotion() {
