@@ -6,16 +6,16 @@ export const MATCH_TYPES = Object.freeze({
 export const MATCH_PHASES = Object.freeze({
   ORIENT: "orient",
   PLAYING: "playing",
-  CHANGE_ENDS: "change-ends",
   GAME_OVER: "game-over",
-  MATCH_OVER: "match-over",
 });
 
 const TEAM_A = "a";
 const TEAM_B = "b";
-const MAX_UNDO_STEPS = 20;
+const CURRENT_VERSION = 2;
+const MAX_UNDO_STEPS = 24;
 
 export function otherTeam(teamId) {
+  assertTeamId(teamId);
   return teamId === TEAM_A ? TEAM_B : TEAM_A;
 }
 
@@ -25,7 +25,7 @@ export function createMatch({ type, teamAName, teamBName, now = Date.now(), id }
   }
 
   return {
-    version: 1,
+    version: CURRENT_VERSION,
     id: id ?? createId(),
     type,
     teams: {
@@ -39,7 +39,6 @@ export function createMatch({ type, teamAName, teamBName, now = Date.now(), id }
     gamesWon: { a: 0, b: 0 },
     games: [],
     leftTeamId: null,
-    midGameChangeEndsDone: false,
     phase: MATCH_PHASES.ORIENT,
     undoStack: [],
   };
@@ -47,6 +46,7 @@ export function createMatch({ type, teamAName, teamBName, now = Date.now(), id }
 
 export function orientMatch(match, leftTeamId, now = Date.now()) {
   assertTeamId(leftTeamId);
+
   return {
     ...match,
     leftTeamId,
@@ -63,31 +63,18 @@ export function addPoint(match, teamId, now = Date.now()) {
   next.currentScore[teamId] += 1;
 
   const opponentId = otherTeam(teamId);
-  const teamScore = next.currentScore[teamId];
-  const opponentScore = next.currentScore[opponentId];
-
-  if (isGameWon(teamScore, opponentScore)) {
-    next.games.push({
-      number: next.currentGame,
-      a: next.currentScore.a,
-      b: next.currentScore.b,
-      winner: teamId,
-    });
-    next.gamesWon[teamId] += 1;
-    next.phase = next.gamesWon[teamId] === 2
-      ? MATCH_PHASES.MATCH_OVER
-      : MATCH_PHASES.GAME_OVER;
+  if (!isGameWon(next.currentScore[teamId], next.currentScore[opponentId])) {
     return next;
   }
 
-  if (
-    next.currentGame === 3
-    && !next.midGameChangeEndsDone
-    && teamScore === 11
-  ) {
-    next.phase = MATCH_PHASES.CHANGE_ENDS;
-  }
-
+  next.games.push({
+    number: next.currentGame,
+    a: next.currentScore.a,
+    b: next.currentScore.b,
+    winner: teamId,
+  });
+  next.gamesWon[teamId] += 1;
+  next.phase = MATCH_PHASES.GAME_OVER;
   return next;
 }
 
@@ -118,7 +105,6 @@ export function undoLastScoreChange(match, now = Date.now()) {
     currentScore: { ...previous.currentScore },
     gamesWon: { ...previous.gamesWon },
     games: previous.games.map((game) => ({ ...game })),
-    midGameChangeEndsDone: previous.midGameChangeEndsDone,
     phase: previous.phase,
     undoStack,
     updatedAt: now,
@@ -137,20 +123,6 @@ export function switchEnds(match, now = Date.now()) {
   };
 }
 
-export function confirmMidGameChangeEnds(match, now = Date.now()) {
-  if (match.phase !== MATCH_PHASES.CHANGE_ENDS) {
-    return match;
-  }
-
-  return {
-    ...switchEnds(match, now),
-    midGameChangeEndsDone: true,
-    phase: MATCH_PHASES.PLAYING,
-    undoStack: [],
-    updatedAt: now,
-  };
-}
-
 export function startNextGame(match, now = Date.now()) {
   if (match.phase !== MATCH_PHASES.GAME_OVER) {
     return match;
@@ -160,8 +132,6 @@ export function startNextGame(match, now = Date.now()) {
     ...match,
     currentGame: match.currentGame + 1,
     currentScore: { a: 0, b: 0 },
-    leftTeamId: otherTeam(match.leftTeamId),
-    midGameChangeEndsDone: false,
     phase: MATCH_PHASES.PLAYING,
     undoStack: [],
     updatedAt: now,
@@ -177,19 +147,20 @@ export function isGameWon(score, opponentScore) {
 }
 
 export function getMatchWinner(match) {
-  if (match.gamesWon.a === 2) return TEAM_A;
-  if (match.gamesWon.b === 2) return TEAM_B;
-  return null;
+  if (match.gamesWon.a === match.gamesWon.b) {
+    return null;
+  }
+
+  return match.gamesWon.a > match.gamesWon.b ? TEAM_A : TEAM_B;
 }
 
 export function toHistoryRecord(match, endedAt = Date.now()) {
-  const winner = getMatchWinner(match);
-  if (!winner || match.phase !== MATCH_PHASES.MATCH_OVER) {
-    throw new Error("Only completed matches can be added to history.");
+  if (match.phase !== MATCH_PHASES.GAME_OVER || match.games.length === 0) {
+    throw new Error("Finish the current game before completing the match.");
   }
 
   return {
-    version: 1,
+    version: CURRENT_VERSION,
     id: match.id,
     type: match.type,
     teams: {
@@ -199,18 +170,56 @@ export function toHistoryRecord(match, endedAt = Date.now()) {
     startedAt: match.startedAt,
     endedAt,
     gamesWon: { ...match.gamesWon },
-    winner,
+    winner: getMatchWinner(match),
     games: match.games.map((game) => ({ ...game })),
+  };
+}
+
+export function normalizeActiveMatch(value) {
+  if (isUsableActiveMatch(value)) {
+    return value;
+  }
+
+  if (!isLegacyActiveMatch(value)) {
+    return null;
+  }
+
+  const legacyPhase = value.phase;
+  const phase = legacyPhase === "orient"
+    ? MATCH_PHASES.ORIENT
+    : legacyPhase === "game-over" || legacyPhase === "match-over"
+      ? MATCH_PHASES.GAME_OVER
+      : MATCH_PHASES.PLAYING;
+
+  const currentGame = Math.max(1, Number.isInteger(value.currentGame) ? value.currentGame : 1);
+
+  return {
+    version: CURRENT_VERSION,
+    id: value.id,
+    type: value.type,
+    teams: {
+      a: { id: TEAM_A, name: value.teams.a.name },
+      b: { id: TEAM_B, name: value.teams.b.name },
+    },
+    startedAt: Number.isFinite(value.startedAt) ? value.startedAt : Date.now(),
+    updatedAt: Date.now(),
+    currentGame,
+    currentScore: { ...value.currentScore },
+    gamesWon: { ...value.gamesWon },
+    games: value.games.map((game) => ({ ...game })),
+    leftTeamId: value.leftTeamId ?? null,
+    phase,
+    undoStack: [],
   };
 }
 
 export function isUsableActiveMatch(value) {
   if (!value || typeof value !== "object") return false;
-  if (value.version !== 1 || typeof value.id !== "string") return false;
+  if (value.version !== CURRENT_VERSION || typeof value.id !== "string") return false;
   if (!Object.values(MATCH_TYPES).includes(value.type)) return false;
   if (!Object.values(MATCH_PHASES).includes(value.phase)) return false;
   if (!value.teams?.a?.name || !value.teams?.b?.name) return false;
-  if (!Number.isInteger(value.currentGame) || value.currentGame < 1 || value.currentGame > 3) return false;
+  if (!Number.isInteger(value.currentGame) || value.currentGame < 1) return false;
   if (!isScorePair(value.currentScore) || !isScorePair(value.gamesWon)) return false;
   if (value.leftTeamId !== null && value.leftTeamId !== TEAM_A && value.leftTeamId !== TEAM_B) return false;
   if (!Array.isArray(value.games) || !Array.isArray(value.undoStack)) return false;
@@ -223,7 +232,6 @@ function withUndoSnapshot(match, now) {
     currentScore: { ...match.currentScore },
     gamesWon: { ...match.gamesWon },
     games: match.games.map((game) => ({ ...game })),
-    midGameChangeEndsDone: match.midGameChangeEndsDone,
     phase: match.phase,
   };
 
@@ -250,11 +258,27 @@ function assertTeamId(teamId) {
 }
 
 function isScorePair(value) {
-  return value
+  return Boolean(
+    value
     && Number.isInteger(value.a)
     && Number.isInteger(value.b)
     && value.a >= 0
-    && value.b >= 0;
+    && value.b >= 0,
+  );
+}
+
+function isLegacyActiveMatch(value) {
+  return Boolean(
+    value
+    && value.version === 1
+    && typeof value.id === "string"
+    && Object.values(MATCH_TYPES).includes(value.type)
+    && value.teams?.a?.name
+    && value.teams?.b?.name
+    && isScorePair(value.currentScore)
+    && isScorePair(value.gamesWon)
+    && Array.isArray(value.games),
+  );
 }
 
 function createId() {
