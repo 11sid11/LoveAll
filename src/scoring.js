@@ -118,7 +118,6 @@ export function undoLastScoreChange(match, now = Date.now()) {
     currentScore: { ...previous.currentScore },
     gamesWon: { ...previous.gamesWon },
     games: previous.games.map((game) => ({ ...game })),
-    leftTeamId: previous.leftTeamId,
     midGameChangeEndsDone: previous.midGameChangeEndsDone,
     phase: previous.phase,
     undoStack,
@@ -147,6 +146,7 @@ export function confirmMidGameChangeEnds(match, now = Date.now()) {
     ...switchEnds(match, now),
     midGameChangeEndsDone: true,
     phase: MATCH_PHASES.PLAYING,
+    undoStack: [],
     updatedAt: now,
   };
 }
@@ -223,7 +223,6 @@ function withUndoSnapshot(match, now) {
     currentScore: { ...match.currentScore },
     gamesWon: { ...match.gamesWon },
     games: match.games.map((game) => ({ ...game })),
-    leftTeamId: match.leftTeamId,
     midGameChangeEndsDone: match.midGameChangeEndsDone,
     phase: match.phase,
   };
