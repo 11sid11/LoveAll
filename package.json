@@ -1,0 +1,13 @@
+{
+  "name": "loveall",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/scoring.js && node --check src/storage.js && node --check src/haptics.js && node --check src/app.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
