@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b0b">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="LoveAll — a fast, court-oriented badminton scorekeeper.">
+  <title>LoveAll — Badminton Scoring</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell" id="app">
+    <header class="site-header" id="site-header">
+      <button class="brand-button" id="brand-home" type="button" aria-label="LoveAll home">
+        <span class="brand-mark" aria-hidden="true">0<span>:</span>0</span>
+        <span class="brand-word">LOVEALL</span>
+      </button>
+      <button class="quiet-button" id="open-history" type="button">History</button>
+    </header>
+
+    <main>
+      <section class="view home-view" id="home-view" aria-labelledby="home-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Badminton scoring, simplified</p>
+          <h1 id="home-title">Keep your eyes<br>on the rally.</h1>
+          <p class="hero-subtitle">Set the court once. Then score the side you see.</p>
+        </div>
+
+        <div class="resume-card" id="resume-card" hidden>
+          <div>
+            <p class="card-label">Match in progress</p>
+            <p class="resume-match" id="resume-match"></p>
+            <p class="card-meta" id="resume-meta"></p>
+          </div>
+          <div class="resume-actions">
+            <button class="secondary-button" id="discard-match" type="button">Discard</button>
+            <button class="primary-button compact" id="resume-match-button" type="button">Resume</button>
+          </div>
+        </div>
+
+        <div class="home-actions">
+          <button class="primary-button start-button" id="new-match" type="button">
+            <span>New match</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+
+        <section class="recent-section" aria-labelledby="recent-title">
+          <div class="section-heading-row">
+            <h2 id="recent-title">Recent</h2>
+            <button class="text-button" id="view-all-history" type="button">View history</button>
+          </div>
+          <div class="recent-list" id="recent-list"></div>
+          <p class="empty-state" id="recent-empty">Completed matches will appear here.</p>
+        </section>
+      </section>
+
+      <section class="view setup-view" id="setup-view" aria-labelledby="setup-title" hidden>
+        <button class="back-button" id="setup-back" type="button" aria-label="Back">← <span>Back</span></button>
+        <div class="setup-panel">
+          <p class="eyebrow">New match</p>
+          <h1 id="setup-title">Who's playing?</h1>
+
+          <form id="setup-form" novalidate>
+            <fieldset class="match-type-fieldset">
+              <legend>Match type</legend>
+              <div class="segmented-control">
+                <label>
+                  <input type="radio" name="match-type" value="singles" checked>
+                  <span>Singles</span>
+                </label>
+                <label>
+                  <input type="radio" name="match-type" value="doubles">
+                  <span>Doubles</span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="name-grid">
+              <label class="field-label" for="team-a-name">
+                <span id="team-a-label">Player A</span>
+                <input id="team-a-name" name="team-a-name" type="text" maxlength="30" autocomplete="off" placeholder="Sid" required>
+              </label>
+              <label class="field-label" for="team-b-name">
+                <span id="team-b-label">Player B</span>
+                <input id="team-b-name" name="team-b-name" type="text" maxlength="30" autocomplete="off" placeholder="Rahul" required>
+              </label>
+            </div>
+
+            <p class="form-hint" id="doubles-hint" hidden>Use team names or both player names, for example “Sid / Aman”.</p>
+            <p class="form-error" id="setup-error" role="alert" hidden></p>
+
+            <button class="primary-button start-button" type="submit">
+              <span>Set court</span>
+              <span aria-hidden="true">→</span>
+            </button>
+            <p class="rules-note">Best of 3 · 21 points · win by 2 · cap at 30</p>
+          </form>
+        </div>
+      </section>
+
+      <section class="view orient-view" id="orient-view" aria-labelledby="orient-title" hidden>
+        <div class="orient-wrap">
+          <button class="back-button" id="orient-back" type="button" aria-label="Back">← <span>Back</span></button>
+          <div class="orient-copy">
+            <p class="eyebrow">Set your view</p>
+            <h1 id="orient-title">Who's on your left?</h1>
+            <p>Stand where you'll keep score and tap the player or team physically on your left.</p>
+          </div>
+          <div class="court-preview" aria-hidden="true">
+            <span>LEFT</span>
+            <div class="court-net"></div>
+            <span>RIGHT</span>
+          </div>
+          <div class="orientation-choices">
+            <button class="orientation-card" id="orient-a" type="button">
+              <span class="orientation-side">Left side</span>
+              <strong id="orient-a-name"></strong>
+            </button>
+            <button class="orientation-card" id="orient-b" type="button">
+              <span class="orientation-side">Left side</span>
+              <strong id="orient-b-name"></strong>
+            </button>
+          </div>
+          <p class="orient-footnote">You can switch court sides anytime without changing the score.</p>
+        </div>
+      </section>
+
+      <section class="score-view" id="score-view" aria-label="Live badminton scoreboard" hidden>
+        <header class="score-header">
+          <button class="icon-button" id="score-home" type="button" aria-label="Leave scoreboard and keep match saved">←</button>
+          <div class="score-match-meta">
+            <span class="live-dot" aria-hidden="true"></span>
+            <strong id="game-label">Game 1</strong>
+            <span id="match-score-label">0–0 games</span>
+          </div>
+          <button class="icon-button" id="fullscreen-button" type="button" aria-label="Enter fullscreen">⛶</button>
+        </header>
+
+        <div class="score-court">
+          <section class="score-side" id="left-score-side" aria-label="Left court side">
+            <div class="side-heading">
+              <div>
+                <span class="court-side-label">LEFT</span>
+                <h2 id="left-name">Player A</h2>
+              </div>
+              <div class="game-pips" id="left-game-pips" aria-label="Games won"></div>
+            </div>
+            <div class="score-number" id="left-score">0</div>
+            <button class="score-add" id="left-add" type="button">
+              <span class="add-glyph" aria-hidden="true">+</span>
+              <span class="add-label">POINT</span>
+            </button>
+            <button class="score-minus" id="left-minus" type="button" aria-label="Subtract one point from left side">−</button>
+          </section>
+
+          <div class="court-divider" aria-hidden="true"><span></span></div>
+
+          <section class="score-side" id="right-score-side" aria-label="Right court side">
+            <div class="side-heading">
+              <div>
+                <span class="court-side-label">RIGHT</span>
+                <h2 id="right-name">Player B</h2>
+              </div>
+              <div class="game-pips" id="right-game-pips" aria-label="Games won"></div>
+            </div>
+            <div class="score-number" id="right-score">0</div>
+            <button class="score-add" id="right-add" type="button">
+              <span class="add-glyph" aria-hidden="true">+</span>
+              <span class="add-label">POINT</span>
+            </button>
+            <button class="score-minus" id="right-minus" type="button" aria-label="Subtract one point from right side">−</button>
+          </section>
+        </div>
+
+        <footer class="score-footer">
+          <button class="score-tool" id="undo-button" type="button">↶ <span>Undo</span></button>
+          <button class="switch-button" id="switch-sides" type="button"><span aria-hidden="true">⇄</span> Switch sides</button>
+          <span class="score-footnote">Tap the side that won the rally</span>
+        </footer>
+
+        <div class="rotate-device" aria-hidden="true">
+          <div class="rotate-icon">↻</div>
+          <strong>Rotate to landscape</strong>
+          <span>The scoreboard is designed to match the court.</span>
+        </div>
+      </section>
+
+      <section class="view history-view" id="history-view" aria-labelledby="history-title" hidden>
+        <button class="back-button" id="history-back" type="button" aria-label="Back">← <span>Back</span></button>
+        <div class="history-header">
+          <p class="eyebrow">Local history</p>
+          <h1 id="history-title">Matches</h1>
+          <p>Stored only on this device.</p>
+        </div>
+        <div class="history-groups" id="history-groups"></div>
+        <p class="empty-state history-empty" id="history-empty">No completed matches yet.</p>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="modal" hidden>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-copy">
+        <p class="modal-kicker" id="modal-kicker"></p>
+        <h2 id="modal-title"></h2>
+        <p id="modal-copy"></p>
+        <div class="modal-score" id="modal-score" hidden></div>
+        <div class="modal-actions">
+          <button class="secondary-button" id="modal-secondary" type="button"></button>
+          <button class="primary-button compact" id="modal-primary" type="button"></button>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <div class="sr-only" id="score-live" aria-live="polite"></div>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
