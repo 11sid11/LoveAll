@@ -2,9 +2,7 @@ import {
   MATCH_PHASES,
   MATCH_TYPES,
   addPoint,
-  confirmMidGameChangeEnds,
   createMatch,
-  getMatchWinner,
   orientMatch,
   otherTeam,
   startNextGame,
@@ -21,7 +19,9 @@ import {
   loadHistory,
   saveActiveMatch,
 } from "./storage.js";
-import { haptic, tryEnterFullscreen } from "./haptics.js";
+import { haptic, supportsHaptics, tryEnterFullscreen } from "./haptics.js";
+import { celebrateGame, celebratePoint } from "./effects.js";
+import { setupInstallExperience } from "./install.js";
 
 const views = {
   home: document.querySelector("#home-view"),
@@ -35,6 +35,7 @@ const elements = {
   body: document.body,
   siteHeader: document.querySelector("#site-header"),
   brandHome: document.querySelector("#brand-home"),
+  installApp: document.querySelector("#install-app"),
   openHistory: document.querySelector("#open-history"),
   viewAllHistory: document.querySelector("#view-all-history"),
   newMatch: document.querySelector("#new-match"),
@@ -56,24 +57,24 @@ const elements = {
   orientBack: document.querySelector("#orient-back"),
   orientA: document.querySelector("#orient-a"),
   orientB: document.querySelector("#orient-b"),
-  orientAName: document.querySelector("#orient-a-name"),
-  orientBName: document.querySelector("#orient-b-name"),
+  orientALeft: document.querySelector("#orient-a-left"),
+  orientARight: document.querySelector("#orient-a-right"),
+  orientBLeft: document.querySelector("#orient-b-left"),
+  orientBRight: document.querySelector("#orient-b-right"),
   scoreHome: document.querySelector("#score-home"),
   fullscreenButton: document.querySelector("#fullscreen-button"),
   gameLabel: document.querySelector("#game-label"),
-  matchScoreLabel: document.querySelector("#match-score-label"),
   leftName: document.querySelector("#left-name"),
   rightName: document.querySelector("#right-name"),
   leftScore: document.querySelector("#left-score"),
   rightScore: document.querySelector("#right-score"),
-  leftGamePips: document.querySelector("#left-game-pips"),
-  rightGamePips: document.querySelector("#right-game-pips"),
   leftAdd: document.querySelector("#left-add"),
   rightAdd: document.querySelector("#right-add"),
   leftMinus: document.querySelector("#left-minus"),
   rightMinus: document.querySelector("#right-minus"),
   undoButton: document.querySelector("#undo-button"),
   switchSides: document.querySelector("#switch-sides"),
+  gameCelebration: document.querySelector("#game-celebration"),
   scoreLive: document.querySelector("#score-live"),
   historyBack: document.querySelector("#history-back"),
   historyGroups: document.querySelector("#history-groups"),
@@ -85,13 +86,16 @@ const elements = {
   modalScore: document.querySelector("#modal-score"),
   modalPrimary: document.querySelector("#modal-primary"),
   modalSecondary: document.querySelector("#modal-secondary"),
+  modalTertiary: document.querySelector("#modal-tertiary"),
   toast: document.querySelector("#toast"),
 };
 
 let activeMatch = loadActiveMatch();
 let modalPrimaryAction = null;
 let modalSecondaryAction = null;
+let modalTertiaryAction = null;
 let toastTimer = null;
+let hapticNoticeShown = false;
 
 initialize();
 
@@ -101,6 +105,7 @@ function initialize() {
   bindOrientation();
   bindScoring();
   bindModal();
+  setupInstall();
   renderHome();
   showView("home");
 }
@@ -119,7 +124,6 @@ function bindNavigation() {
   });
 
   elements.newMatch.addEventListener("click", beginNewMatch);
-
   elements.setupBack.addEventListener("click", () => {
     renderHome();
     showView("home");
@@ -198,7 +202,7 @@ function bindScoring() {
     activeMatch = switchEnds(activeMatch);
     persistAndRenderScore();
     haptic("switch");
-    showToast("Court sides switched");
+    showToast("Screen sides switched");
   });
 
   elements.scoreHome.addEventListener("click", () => {
@@ -224,12 +228,26 @@ function bindReactiveButton(button) {
 }
 
 function bindModal() {
-  elements.modalPrimary.addEventListener("click", () => {
-    modalPrimaryAction?.();
-  });
+  elements.modalPrimary.addEventListener("click", () => modalPrimaryAction?.());
+  elements.modalSecondary.addEventListener("click", () => modalSecondaryAction?.());
+  elements.modalTertiary.addEventListener("click", () => modalTertiaryAction?.());
+}
 
-  elements.modalSecondary.addEventListener("click", () => {
-    modalSecondaryAction?.();
+function setupInstall() {
+  setupInstallExperience({
+    button: elements.installApp,
+    onInstalled: () => showToast("LoveAll installed"),
+    onManualInstall: ({ isAppleMobile }) => {
+      showModal({
+        kicker: "Install LoveAll",
+        title: isAppleMobile ? "Add it to your Home Screen" : "Install from your browser",
+        copy: isAppleMobile
+          ? "In Safari, tap Share, choose Add to Home Screen, turn on Open as Web App, then tap Add."
+          : "Open your browser menu and choose Install app or Add to Home Screen. The exact wording depends on your browser.",
+        primaryLabel: "Got it",
+        onPrimary: hideModal,
+      });
+    },
   });
 }
 
@@ -242,7 +260,7 @@ function beginNewMatch() {
   showModal({
     kicker: "Match in progress",
     title: "Start a new match?",
-    copy: "Starting over will discard the current score. Your completed match history will stay untouched.",
+    copy: "Starting over will discard the current score. Completed history stays untouched.",
     secondaryLabel: "Keep match",
     primaryLabel: "Start new",
     onSecondary: hideModal,
@@ -276,27 +294,24 @@ function handleAddPoint(side, event) {
   if (!activeMatch || activeMatch.phase !== MATCH_PHASES.PLAYING) return;
 
   const teamId = teamForPhysicalSide(side);
-  const previousPhase = activeMatch.phase;
   activeMatch = addPoint(activeMatch, teamId);
 
   const button = side === "left" ? elements.leftAdd : elements.rightAdd;
   setTapOrigin(button, event);
   pulseButton(button);
+  celebratePoint(button, event);
 
-  if (activeMatch.phase === MATCH_PHASES.MATCH_OVER) {
-    haptic("match");
-  } else if (activeMatch.phase === MATCH_PHASES.GAME_OVER) {
-    haptic("game");
-  } else {
-    haptic("point");
-  }
+  const gameEnded = activeMatch.phase === MATCH_PHASES.GAME_OVER;
+  const vibrated = haptic(gameEnded ? "game" : "point");
 
   persistAndRenderScore();
   animateScore(side);
 
-  if (previousPhase !== activeMatch.phase && activeMatch.phase === MATCH_PHASES.CHANGE_ENDS) {
-    showToast("11-point interval");
+  if (gameEnded) {
+    celebrateGame(elements.gameCelebration, side);
   }
+
+  maybeExplainUnavailableHaptics(vibrated);
 }
 
 function handleSubtractPoint(side) {
@@ -318,7 +333,7 @@ function handleUndo() {
   activeMatch = undoLastScoreChange(activeMatch);
   haptic("undo");
   persistAndRenderScore();
-  showToast("Last score change undone");
+  showToast("Last point undone");
 }
 
 function persistAndRenderScore() {
@@ -342,12 +357,13 @@ function renderResumeCard() {
   elements.resumeMatch.textContent = `${activeMatch.teams.a.name} vs ${activeMatch.teams.b.name}`;
 
   if (activeMatch.phase === MATCH_PHASES.ORIENT) {
-    elements.resumeMeta.textContent = "Court orientation not set";
+    elements.resumeMeta.textContent = "Screen layout not set";
     return;
   }
 
   const score = `${activeMatch.currentScore.a}–${activeMatch.currentScore.b}`;
-  elements.resumeMeta.textContent = `Game ${activeMatch.currentGame} · ${score}`;
+  const status = activeMatch.phase === MATCH_PHASES.GAME_OVER ? "Game complete" : `Game ${activeMatch.currentGame}`;
+  elements.resumeMeta.textContent = `${status} · ${score}`;
 }
 
 function renderRecentMatches() {
@@ -362,10 +378,17 @@ function renderRecentMatches() {
 
 function renderOrientation() {
   if (!activeMatch) return;
-  elements.orientAName.textContent = activeMatch.teams.a.name;
-  elements.orientBName.textContent = activeMatch.teams.b.name;
-  elements.orientA.setAttribute("aria-label", `${activeMatch.teams.a.name} is on my left`);
-  elements.orientB.setAttribute("aria-label", `${activeMatch.teams.b.name} is on my left`);
+
+  const teamA = activeMatch.teams.a.name;
+  const teamB = activeMatch.teams.b.name;
+
+  elements.orientALeft.textContent = teamA;
+  elements.orientARight.textContent = teamB;
+  elements.orientBLeft.textContent = teamB;
+  elements.orientBRight.textContent = teamA;
+
+  elements.orientA.setAttribute("aria-label", `Use layout with ${teamA} on the left half and ${teamB} on the right half`);
+  elements.orientB.setAttribute("aria-label", `Use layout with ${teamB} on the left half and ${teamA} on the right half`);
 }
 
 function renderScore() {
@@ -377,7 +400,6 @@ function renderScore() {
   const rightTeam = activeMatch.teams[rightTeamId];
 
   elements.gameLabel.textContent = `Game ${activeMatch.currentGame}`;
-  elements.matchScoreLabel.textContent = "Best of 3";
   elements.leftName.textContent = leftTeam.name;
   elements.rightName.textContent = rightTeam.name;
   elements.leftScore.textContent = activeMatch.currentScore[leftTeamId];
@@ -387,9 +409,6 @@ function renderScore() {
   elements.rightAdd.setAttribute("aria-label", `Add point to ${rightTeam.name}`);
   elements.leftMinus.setAttribute("aria-label", `Subtract point from ${leftTeam.name}`);
   elements.rightMinus.setAttribute("aria-label", `Subtract point from ${rightTeam.name}`);
-
-  renderGamePips(elements.leftGamePips, activeMatch.gamesWon[leftTeamId]);
-  renderGamePips(elements.rightGamePips, activeMatch.gamesWon[rightTeamId]);
 
   const scoringEnabled = activeMatch.phase === MATCH_PHASES.PLAYING;
   elements.leftAdd.disabled = !scoringEnabled;
@@ -404,83 +423,40 @@ function renderScore() {
   renderPhaseModal();
 }
 
-function renderGamePips(container, wins) {
-  const fragment = document.createDocumentFragment();
-  for (let index = 0; index < 2; index += 1) {
-    const pip = document.createElement("span");
-    pip.className = `game-pip${index < wins ? " won" : ""}`;
-    fragment.append(pip);
-  }
-  container.replaceChildren(fragment);
-}
-
 function renderPhaseModal() {
-  if (!activeMatch) {
+  if (!activeMatch || activeMatch.phase !== MATCH_PHASES.GAME_OVER) {
     hideModal();
     return;
   }
 
-  if (activeMatch.phase === MATCH_PHASES.CHANGE_ENDS) {
-    showModal({
-      kicker: "Game 3 · 11-point interval",
-      title: "Change ends",
-      copy: "Let the players change ends, then remap the screen to match the court.",
-      score: formatCurrentScoreByTeam(),
-      secondaryLabel: "Undo point",
-      primaryLabel: "Sides changed",
-      onSecondary: handleUndo,
-      onPrimary: () => {
-        activeMatch = confirmMidGameChangeEnds(activeMatch);
-        saveActiveMatch(activeMatch);
-        haptic("switch");
-        renderScore();
-      },
-    });
-    return;
-  }
+  const completedGame = activeMatch.games.at(-1);
+  const winnerName = activeMatch.teams[completedGame.winner].name;
 
-  if (activeMatch.phase === MATCH_PHASES.GAME_OVER) {
-    const completedGame = activeMatch.games.at(-1);
-    const winnerName = activeMatch.teams[completedGame.winner].name;
-    showModal({
-      kicker: `Game ${completedGame.number} complete`,
-      title: `${winnerName} takes it`,
-      copy: "Players change ends for the next game. LoveAll will flip the court when you continue.",
-      score: `${completedGame.a} – ${completedGame.b}`,
-      secondaryLabel: "Undo point",
-      primaryLabel: `Start Game ${activeMatch.currentGame + 1}`,
-      onSecondary: handleUndo,
-      onPrimary: () => {
-        activeMatch = startNextGame(activeMatch);
-        saveActiveMatch(activeMatch);
-        haptic("switch");
-        renderScore();
-      },
-    });
-    return;
-  }
+  showModal({
+    kicker: `Game ${completedGame.number} complete`,
+    title: `${winnerName} wins`,
+    copy: "Finish this match here, or play another game with the same players.",
+    score: `${completedGame.a} – ${completedGame.b}`,
+    secondaryLabel: "Finish match",
+    primaryLabel: "Play another game",
+    tertiaryLabel: "Undo last point",
+    onSecondary: completeMatch,
+    onPrimary: startAnotherGame,
+    onTertiary: handleUndo,
+  });
+}
 
-  if (activeMatch.phase === MATCH_PHASES.MATCH_OVER) {
-    const winnerId = getMatchWinner(activeMatch);
-    const winnerName = activeMatch.teams[winnerId].name;
-    showModal({
-      kicker: "Match complete",
-      title: `${winnerName} wins`,
-      copy: `${activeMatch.gamesWon.a}–${activeMatch.gamesWon.b} in games`,
-      score: activeMatch.games.map((game) => `${game.a}–${game.b}`).join("  ·  "),
-      secondaryLabel: "Undo point",
-      primaryLabel: "Done",
-      onSecondary: handleUndo,
-      onPrimary: completeMatch,
-    });
-    return;
-  }
+function startAnotherGame() {
+  if (!activeMatch || activeMatch.phase !== MATCH_PHASES.GAME_OVER) return;
 
-  hideModal();
+  activeMatch = startNextGame(activeMatch);
+  saveActiveMatch(activeMatch);
+  renderScore();
+  showToast(`Game ${activeMatch.currentGame} ready`);
 }
 
 function completeMatch() {
-  if (!activeMatch || activeMatch.phase !== MATCH_PHASES.MATCH_OVER) return;
+  if (!activeMatch || activeMatch.phase !== MATCH_PHASES.GAME_OVER) return;
 
   const record = toHistoryRecord(activeMatch);
   addHistoryRecord(record);
@@ -512,7 +488,7 @@ function confirmDiscardActiveMatch() {
   showModal({
     kicker: "Match in progress",
     title: "Discard match?",
-    copy: "The current score will be removed. Completed match history is not affected.",
+    copy: "The current score will be removed. Completed history is not affected.",
     secondaryLabel: "Keep match",
     primaryLabel: "Discard",
     onSecondary: hideModal,
@@ -588,15 +564,16 @@ function createMatchRow(record, includeDate) {
 
   const detail = document.createElement("div");
   detail.className = "match-detail";
-  const games = record.games.map((game) => `${game.a}–${game.b}`).join(" · ");
+  const gameScores = record.games.map((game) => `${game.a}–${game.b}`).join(" · ");
   const time = formatTime(record.endedAt);
   detail.textContent = includeDate
-    ? `${formatShortDate(record.endedAt)} · ${time} · ${games}`
-    : `${time} · ${games}`;
+    ? `${formatShortDate(record.endedAt)} · ${time} · ${gameScores}`
+    : `${time} · ${gameScores}`;
 
   const result = document.createElement("div");
   result.className = "match-result";
   result.textContent = `${record.gamesWon.a}–${record.gamesWon.b}`;
+  result.setAttribute("aria-label", `${record.gamesWon.a} games to ${record.gamesWon.b}`);
 
   main.append(names, detail);
   row.append(main, result);
@@ -611,11 +588,6 @@ function showView(name) {
   const isScoring = name === "score";
   elements.siteHeader.hidden = isScoring;
   elements.body.classList.toggle("scoring-active", isScoring);
-
-  if (!isScoring && elements.modal.hidden === false && activeMatch?.phase === MATCH_PHASES.PLAYING) {
-    hideModal();
-  }
-
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
@@ -624,20 +596,29 @@ function showModal({
   title,
   copy,
   score = "",
-  secondaryLabel,
+  secondaryLabel = "",
   primaryLabel,
-  onSecondary,
+  tertiaryLabel = "",
+  onSecondary = null,
   onPrimary,
+  onTertiary = null,
 }) {
   elements.modalKicker.textContent = kicker;
   elements.modalTitle.textContent = title;
   elements.modalCopy.textContent = copy;
   elements.modalScore.textContent = score;
   elements.modalScore.hidden = !score;
+
   elements.modalSecondary.textContent = secondaryLabel;
+  elements.modalSecondary.hidden = !secondaryLabel;
   elements.modalPrimary.textContent = primaryLabel;
+  elements.modalTertiary.textContent = tertiaryLabel;
+  elements.modalTertiary.hidden = !tertiaryLabel;
+
   modalSecondaryAction = onSecondary;
   modalPrimaryAction = onPrimary;
+  modalTertiaryAction = onTertiary;
+
   elements.modal.hidden = false;
   requestAnimationFrame(() => elements.modalPrimary.focus());
 }
@@ -646,6 +627,7 @@ function hideModal() {
   elements.modal.hidden = true;
   modalPrimaryAction = null;
   modalSecondaryAction = null;
+  modalTertiaryAction = null;
 }
 
 function resetSetupForm() {
@@ -674,10 +656,6 @@ function teamForPhysicalSide(side) {
   return side === "left" ? activeMatch.leftTeamId : otherTeam(activeMatch.leftTeamId);
 }
 
-function formatCurrentScoreByTeam() {
-  return `${activeMatch.currentScore.a} – ${activeMatch.currentScore.b}`;
-}
-
 function normalizeName(value) {
   return String(value ?? "")
     .trim()
@@ -689,10 +667,14 @@ function setTapOrigin(button, event) {
   const rect = button.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
 
-  const x = ((event.clientX - rect.left) / rect.width) * 100;
-  const y = ((event.clientY - rect.top) / rect.height) * 100;
-  button.style.setProperty("--tap-x", `${Math.max(0, Math.min(100, x))}%`);
-  button.style.setProperty("--tap-y", `${Math.max(0, Math.min(100, y))}%`);
+  const hasPointerPosition = Number.isFinite(event.clientX)
+    && Number.isFinite(event.clientY)
+    && (event.clientX !== 0 || event.clientY !== 0);
+  const x = hasPointerPosition ? event.clientX - rect.left : rect.width / 2;
+  const y = hasPointerPosition ? event.clientY - rect.top : rect.height / 2;
+
+  button.style.setProperty("--tap-x", `${Math.max(0, Math.min(rect.width, x))}px`);
+  button.style.setProperty("--tap-y", `${Math.max(0, Math.min(rect.height, y))}px`);
 }
 
 function pulseButton(button) {
@@ -708,13 +690,27 @@ function animateScore(side) {
   score.classList.add("score-pop");
 }
 
-function showToast(message) {
+function maybeExplainUnavailableHaptics(vibrated) {
+  if (vibrated || hapticNoticeShown) return;
+  hapticNoticeShown = true;
+
+  window.setTimeout(() => {
+    showToast(
+      supportsHaptics()
+        ? "Vibration is unavailable right now — check device vibration settings"
+        : "This browser does not support web vibration — visual feedback is active",
+      2600,
+    );
+  }, 180);
+}
+
+function showToast(message, duration = 1400) {
   window.clearTimeout(toastTimer);
   elements.toast.textContent = message;
   elements.toast.hidden = false;
   toastTimer = window.setTimeout(() => {
     elements.toast.hidden = true;
-  }, 1300);
+  }, duration);
 }
 
 function formatDateKey(dateKey) {

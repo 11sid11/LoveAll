@@ -1,10 +1,10 @@
 {
   "name": "loveall",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check src/scoring.js && node --check src/storage.js && node --check src/haptics.js && node --check src/app.js",
+    "check": "node --check src/scoring.js && node --check src/storage.js && node --check src/haptics.js && node --check src/effects.js && node --check src/install.js && node --check src/app.js && node --check sw.js",
     "test": "node --test"
   },
   "engines": {
