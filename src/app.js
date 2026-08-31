@@ -89,7 +89,6 @@ const elements = {
 };
 
 let activeMatch = loadActiveMatch();
-let currentView = "home";
 let modalPrimaryAction = null;
 let modalSecondaryAction = null;
 let toastTimer = null;
@@ -119,11 +118,7 @@ function bindNavigation() {
     showView("home");
   });
 
-  elements.newMatch.addEventListener("click", () => {
-    resetSetupForm();
-    showView("setup");
-    elements.teamAInput.focus();
-  });
+  elements.newMatch.addEventListener("click", beginNewMatch);
 
   elements.setupBack.addEventListener("click", () => {
     renderHome();
@@ -236,6 +231,34 @@ function bindModal() {
   elements.modalSecondary.addEventListener("click", () => {
     modalSecondaryAction?.();
   });
+}
+
+function beginNewMatch() {
+  if (!activeMatch) {
+    openSetup();
+    return;
+  }
+
+  showModal({
+    kicker: "Match in progress",
+    title: "Start a new match?",
+    copy: "Starting over will discard the current score. Your completed match history will stay untouched.",
+    secondaryLabel: "Keep match",
+    primaryLabel: "Start new",
+    onSecondary: hideModal,
+    onPrimary: () => {
+      clearActiveMatch();
+      activeMatch = null;
+      hideModal();
+      openSetup();
+    },
+  });
+}
+
+function openSetup() {
+  resetSetupForm();
+  showView("setup");
+  requestAnimationFrame(() => elements.teamAInput.focus());
 }
 
 function completeOrientation(leftTeamId) {
@@ -581,7 +604,6 @@ function createMatchRow(record, includeDate) {
 }
 
 function showView(name) {
-  currentView = name;
   for (const [viewName, view] of Object.entries(views)) {
     view.hidden = viewName !== name;
   }
@@ -594,7 +616,7 @@ function showView(name) {
     hideModal();
   }
 
-  window.scrollTo({ top: 0, behavior: "instant" });
+  window.scrollTo({ top: 0, behavior: "auto" });
 }
 
 function showModal({
