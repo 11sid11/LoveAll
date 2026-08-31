@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">LoveAll</title>
+  <rect width="512" height="512" rx="112" fill="#080a0a"/>
+  <rect x="64" y="108" width="384" height="296" rx="48" fill="#101313" stroke="#d8ff57" stroke-opacity="0.42" stroke-width="8"/>
+  <path d="M256 108v296" stroke="#d8ff57" stroke-opacity="0.7" stroke-width="8" stroke-dasharray="12 14"/>
+  <circle cx="188" cy="256" r="54" fill="none" stroke="#f4f6f0" stroke-width="26"/>
+  <circle cx="324" cy="256" r="54" fill="none" stroke="#f4f6f0" stroke-width="26"/>
+  <circle cx="256" cy="256" r="12" fill="#d8ff57"/>
+</svg>
