@@ -1,23 +1,29 @@
-import { isUsableActiveMatch } from "./scoring.js";
+import { normalizeActiveMatch } from "./scoring.js";
 
 const ACTIVE_MATCH_KEY = "loveall.active-match.v1";
 const HISTORY_KEY = "loveall.history.v1";
 const MAX_HISTORY_ITEMS = 300;
 
 export function loadActiveMatch() {
-  const value = readJson(ACTIVE_MATCH_KEY, null);
-  return isUsableActiveMatch(value) ? value : null;
+  const rawValue = readJson(ACTIVE_MATCH_KEY, null);
+  const match = normalizeActiveMatch(rawValue);
+
+  if (match && rawValue?.version !== match.version) {
+    writeJson(ACTIVE_MATCH_KEY, match);
+  }
+
+  return match;
 }
 
 export function saveActiveMatch(match) {
-  writeJson(ACTIVE_MATCH_KEY, match);
+  return writeJson(ACTIVE_MATCH_KEY, match);
 }
 
 export function clearActiveMatch() {
   try {
     localStorage.removeItem(ACTIVE_MATCH_KEY);
   } catch {
-    // Storage may be unavailable in restricted browsing modes. The app stays usable in-memory.
+    // Storage can be unavailable in restricted browsing modes. Keep the in-memory session usable.
   }
 }
 
@@ -34,7 +40,7 @@ export function loadHistory() {
 export function addHistoryRecord(record) {
   const history = loadHistory().filter((item) => item.id !== record.id);
   history.unshift(record);
-  writeJson(HISTORY_KEY, history.slice(0, MAX_HISTORY_ITEMS));
+  return writeJson(HISTORY_KEY, history.slice(0, MAX_HISTORY_ITEMS));
 }
 
 export function getLocalDateKey(timestamp) {
@@ -48,7 +54,7 @@ export function getLocalDateKey(timestamp) {
 function isUsableHistoryRecord(value) {
   return Boolean(
     value
-    && value.version === 1
+    && (value.version === 1 || value.version === 2)
     && typeof value.id === "string"
     && Number.isFinite(value.endedAt)
     && value.teams?.a?.name
