@@ -27,7 +27,7 @@ export async function tryEnterFullscreen(element = document.documentElement) {
   }
 
   try {
-    await element.requestFullscreen({ navigationUI: "hide" });
+    await element.requestFullscreen();
     return true;
   } catch {
     return false;
