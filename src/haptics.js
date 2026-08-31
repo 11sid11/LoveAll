@@ -1,14 +1,17 @@
 const PATTERNS = Object.freeze({
-  point: 14,
-  correction: 8,
-  undo: 10,
-  switch: [12, 34, 12],
-  game: [18, 45, 24],
-  match: [22, 45, 22, 70, 32],
+  point: 34,
+  correction: 18,
+  undo: 22,
+  switch: [24, 42, 24],
+  game: [36, 50, 36, 70, 46],
 });
 
+export function supportsHaptics() {
+  return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+}
+
 export function haptic(kind = "point") {
-  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
+  if (!supportsHaptics()) {
     return false;
   }
 
