@@ -1,0 +1,21 @@
+{
+  "name": "LoveAll — Badminton Scoring",
+  "short_name": "LoveAll",
+  "description": "A fast, court-oriented badminton scorekeeper.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080a0a",
+  "theme_color": "#080a0a",
+  "orientation": "any",
+  "categories": ["sports", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/loveall.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
