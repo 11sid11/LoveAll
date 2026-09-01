@@ -12,7 +12,8 @@ const CORE_ASSETS = [
   "./src/effects.js",
   "./src/install.js",
   "./src/wake-lock.js",
-  "./src/scoring-ui.css"
+  "./src/scoring-ui.css",
+  "./src/qol.css"
 ];
 
 self.addEventListener("install", (event) => {
