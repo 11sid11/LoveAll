@@ -82,3 +82,40 @@ test("side switching lives in the court divider instead of the bottom toolbar", 
   assert.match(html, /class="court-swap-button"/);
   assert.match(html, /LoveAll never flips them automatically/);
 });
+
+test("setup exposes lightweight recent-name shortcuts", () => {
+  assert.match(html, /id="team-a-recent"/);
+  assert.match(html, /id="team-b-recent"/);
+  assert.match(app, /function getRecentNames/);
+  assert.match(app, /record\.type !== type/);
+  assert.match(app, /recent-name-chip/);
+});
+
+test("history save failure keeps the active match intact", () => {
+  const completeMatch = functionBlock("completeMatch", "resumeActiveMatch");
+  const saveIndex = completeMatch.indexOf("addHistoryRecord(record)");
+  const clearIndex = completeMatch.indexOf("clearActiveMatch()");
+
+  assert.ok(saveIndex >= 0, "history is saved");
+  assert.ok(clearIndex > saveIndex, "active match is cleared only after the save attempt");
+  assert.match(completeMatch, /if \(!addHistoryRecord\(record\)\)/);
+  assert.match(completeMatch, /score kept/);
+});
+
+test("history rows support rematch and deliberate deletion", () => {
+  assert.match(app, /createMatchAction\("↻ Rematch"/);
+  assert.match(app, /confirmDeleteHistoryRecord/);
+  assert.match(app, /deleteHistoryRecord/);
+  assert.match(app, /Start this rematch\?/);
+});
+
+test("live scoring requests wake lock and releases it when leaving", () => {
+  const showView = functionBlock("showView", "showModal");
+  const lifecycle = functionBlock("bindLifecycle", "bindSetup");
+
+  assert.match(app, /from "\.\/wake-lock\.js"/);
+  assert.match(showView, /requestScreenWakeLock\(\)/);
+  assert.match(showView, /releaseScreenWakeLock\(\)/);
+  assert.match(lifecycle, /visibilitychange/);
+  assert.match(lifecycle, /requestScreenWakeLock\(\)/);
+});
