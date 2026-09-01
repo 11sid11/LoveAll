@@ -26,12 +26,14 @@ test("service worker precaches all runtime modules needed for offline scoring", 
     "./src/haptics.js",
     "./src/effects.js",
     "./src/install.js",
+    "./src/scoring-ui.css",
   ]) {
     assert.match(serviceWorker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 });
 
-test("Pages workflow publishes the PWA manifest, worker, and icon directory", () => {
+test("Pages workflow publishes the PWA manifest, worker, icon directory, and src assets", () => {
   assert.match(workflow, /manifest\.webmanifest sw\.js/);
   assert.match(workflow, /cp -R icons _site\/icons/);
+  assert.match(workflow, /cp -R src _site\/src/);
 });

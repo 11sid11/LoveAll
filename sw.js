@@ -1,4 +1,4 @@
-const CACHE_NAME = "loveall-v3";
+const CACHE_NAME = "loveall-v4";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +10,8 @@ const CORE_ASSETS = [
   "./src/storage.js",
   "./src/haptics.js",
   "./src/effects.js",
-  "./src/install.js"
+  "./src/install.js",
+  "./src/scoring-ui.css"
 ];
 
 self.addEventListener("install", (event) => {

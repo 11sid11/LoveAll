@@ -19,7 +19,12 @@ import {
   loadHistory,
   saveActiveMatch,
 } from "./storage.js";
-import { haptic, supportsHaptics, tryEnterFullscreen } from "./haptics.js";
+import {
+  haptic,
+  tryEnterFullscreen,
+  tryLockLandscape,
+  tryUnlockOrientation,
+} from "./haptics.js";
 import { celebrateGame, celebratePoint } from "./effects.js";
 import { setupInstallExperience } from "./install.js";
 
@@ -95,7 +100,6 @@ let modalPrimaryAction = null;
 let modalSecondaryAction = null;
 let modalTertiaryAction = null;
 let toastTimer = null;
-let hapticNoticeShown = false;
 
 initialize();
 
@@ -188,8 +192,8 @@ function bindOrientation() {
 }
 
 function bindScoring() {
-  bindReactiveButton(elements.leftAdd);
-  bindReactiveButton(elements.rightAdd);
+  bindReactiveButton(elements.leftAdd, () => haptic("point"));
+  bindReactiveButton(elements.rightAdd, () => haptic("point"));
 
   elements.leftAdd.addEventListener("click", (event) => handleAddPoint("left", event));
   elements.rightAdd.addEventListener("click", (event) => handleAddPoint("right", event));
@@ -201,25 +205,28 @@ function bindScoring() {
     if (!activeMatch || activeMatch.phase !== MATCH_PHASES.PLAYING) return;
     activeMatch = switchEnds(activeMatch);
     persistAndRenderScore();
+    animateSideSwitch();
     haptic("switch");
-    showToast("Screen sides switched");
   });
 
   elements.scoreHome.addEventListener("click", () => {
-    leaveFullscreen();
     renderHome();
     showView("home");
   });
 
-  elements.fullscreenButton.addEventListener("click", () => {
-    tryEnterFullscreen(document.documentElement);
+  elements.fullscreenButton.addEventListener("click", async () => {
+    const entered = await tryEnterFullscreen(document.documentElement);
+    if (entered) {
+      void tryLockLandscape();
+    }
   });
 }
 
-function bindReactiveButton(button) {
+function bindReactiveButton(button, onPress = null) {
   button.addEventListener("pointerdown", (event) => {
     setTapOrigin(button, event);
     button.classList.add("is-pressed");
+    onPress?.();
   });
 
   for (const eventName of ["pointerup", "pointercancel", "pointerleave", "blur"]) {
@@ -287,7 +294,6 @@ function completeOrientation(leftTeamId) {
   renderScore();
   showView("score");
   haptic("switch");
-  tryEnterFullscreen(document.documentElement);
 }
 
 function handleAddPoint(side, event) {
@@ -302,7 +308,9 @@ function handleAddPoint(side, event) {
   celebratePoint(button, event);
 
   const gameEnded = activeMatch.phase === MATCH_PHASES.GAME_OVER;
-  const vibrated = haptic(gameEnded ? "game" : "point");
+  if (gameEnded) {
+    haptic("game");
+  }
 
   persistAndRenderScore();
   animateScore(side);
@@ -310,8 +318,6 @@ function handleAddPoint(side, event) {
   if (gameEnded) {
     celebrateGame(elements.gameCelebration, side);
   }
-
-  maybeExplainUnavailableHaptics(vibrated);
 }
 
 function handleSubtractPoint(side) {
@@ -463,7 +469,6 @@ function completeMatch() {
   clearActiveMatch();
   activeMatch = null;
   hideModal();
-  leaveFullscreen();
   renderHome();
   showView("home");
   showToast("Match saved to history");
@@ -581,6 +586,8 @@ function createMatchRow(record, includeDate) {
 }
 
 function showView(name) {
+  const wasScoring = !views.score.hidden;
+
   for (const [viewName, view] of Object.entries(views)) {
     view.hidden = viewName !== name;
   }
@@ -588,6 +595,14 @@ function showView(name) {
   const isScoring = name === "score";
   elements.siteHeader.hidden = isScoring;
   elements.body.classList.toggle("scoring-active", isScoring);
+
+  if (isScoring && !wasScoring) {
+    void tryLockLandscape();
+  } else if (!isScoring && wasScoring) {
+    tryUnlockOrientation();
+    leaveFullscreen();
+  }
+
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
@@ -690,18 +705,11 @@ function animateScore(side) {
   score.classList.add("score-pop");
 }
 
-function maybeExplainUnavailableHaptics(vibrated) {
-  if (vibrated || hapticNoticeShown) return;
-  hapticNoticeShown = true;
-
-  window.setTimeout(() => {
-    showToast(
-      supportsHaptics()
-        ? "Vibration is unavailable right now — check device vibration settings"
-        : "This browser does not support web vibration — visual feedback is active",
-      2600,
-    );
-  }, 180);
+function animateSideSwitch() {
+  elements.switchSides.classList.remove("is-switching");
+  void elements.switchSides.offsetWidth;
+  elements.switchSides.classList.add("is-switching");
+  window.setTimeout(() => elements.switchSides.classList.remove("is-switching"), 280);
 }
 
 function showToast(message, duration = 1400) {
