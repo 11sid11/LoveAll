@@ -69,12 +69,34 @@
   cursor: default;
 }
 
-.court-swap-icon {
+.court-divider .court-swap-icon {
+  position: static;
   display: block;
+  width: auto;
+  height: auto;
+  background: none;
   color: var(--accent);
   font-size: 23px;
   line-height: 1;
+  opacity: 1;
   transform: rotate(0deg);
+}
+
+.court-divider .sr-only {
+  position: absolute;
+  top: auto;
+  left: auto;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  background: none;
+  opacity: 1;
+  transform: none;
 }
 
 .court-swap-button.is-switching .court-swap-icon {
@@ -108,7 +130,7 @@
     height: 44px;
   }
 
-  .court-swap-icon {
+  .court-divider .court-swap-icon {
     font-size: 20px;
   }
 
