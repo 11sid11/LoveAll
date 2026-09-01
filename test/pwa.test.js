@@ -26,7 +26,9 @@ test("service worker precaches all runtime modules needed for offline scoring", 
     "./src/haptics.js",
     "./src/effects.js",
     "./src/install.js",
+    "./src/wake-lock.js",
     "./src/scoring-ui.css",
+    "./src/qol.css",
   ]) {
     assert.match(serviceWorker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }

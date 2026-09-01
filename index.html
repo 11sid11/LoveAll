@@ -15,6 +15,7 @@
   <link rel="icon" href="./icons/loveall.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./src/scoring-ui.css">
+  <link rel="stylesheet" href="./src/qol.css">
 </head>
 <body>
   <div class="app-shell" id="app">
@@ -91,14 +92,20 @@
             </fieldset>
 
             <div class="name-grid">
-              <label class="field-label" for="team-a-name">
-                <span id="team-a-label">Player A</span>
-                <input id="team-a-name" name="team-a-name" type="text" maxlength="30" autocomplete="off" placeholder="Sid" required>
-              </label>
-              <label class="field-label" for="team-b-name">
-                <span id="team-b-label">Player B</span>
-                <input id="team-b-name" name="team-b-name" type="text" maxlength="30" autocomplete="off" placeholder="Rahul" required>
-              </label>
+              <div class="name-field">
+                <label class="field-label" for="team-a-name">
+                  <span id="team-a-label">Player A</span>
+                  <input id="team-a-name" name="team-a-name" type="text" maxlength="30" autocomplete="off" placeholder="Sid" required>
+                </label>
+                <div class="recent-name-options" id="team-a-recent" hidden></div>
+              </div>
+              <div class="name-field">
+                <label class="field-label" for="team-b-name">
+                  <span id="team-b-label">Player B</span>
+                  <input id="team-b-name" name="team-b-name" type="text" maxlength="30" autocomplete="off" placeholder="Rahul" required>
+                </label>
+                <div class="recent-name-options" id="team-b-recent" hidden></div>
+              </div>
             </div>
 
             <p class="form-hint" id="doubles-hint" hidden>Use team names or both player names, for example “Sid / Aman”.</p>

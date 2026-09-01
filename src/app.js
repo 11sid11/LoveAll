@@ -14,6 +14,7 @@ import {
 import {
   addHistoryRecord,
   clearActiveMatch,
+  deleteHistoryRecord,
   getLocalDateKey,
   loadActiveMatch,
   loadHistory,
@@ -27,6 +28,7 @@ import {
 } from "./haptics.js";
 import { celebrateGame, celebratePoint } from "./effects.js";
 import { setupInstallExperience } from "./install.js";
+import { releaseScreenWakeLock, requestScreenWakeLock } from "./wake-lock.js";
 
 const views = {
   home: document.querySelector("#home-view"),
@@ -58,6 +60,8 @@ const elements = {
   teamBInput: document.querySelector("#team-b-name"),
   teamALabel: document.querySelector("#team-a-label"),
   teamBLabel: document.querySelector("#team-b-label"),
+  teamARecent: document.querySelector("#team-a-recent"),
+  teamBRecent: document.querySelector("#team-b-recent"),
   doublesHint: document.querySelector("#doubles-hint"),
   orientBack: document.querySelector("#orient-back"),
   orientA: document.querySelector("#orient-a"),
@@ -105,6 +109,7 @@ initialize();
 
 function initialize() {
   bindNavigation();
+  bindLifecycle();
   bindSetup();
   bindOrientation();
   bindScoring();
@@ -135,6 +140,14 @@ function bindNavigation() {
 
   elements.resumeButton.addEventListener("click", resumeActiveMatch);
   elements.discardMatch.addEventListener("click", confirmDiscardActiveMatch);
+}
+
+function bindLifecycle() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !views.score.hidden) {
+      void requestScreenWakeLock();
+    }
+  });
 }
 
 function bindSetup() {
@@ -378,7 +391,10 @@ function renderRecentMatches() {
   elements.recentEmpty.hidden = recent.length > 0;
 
   for (const record of recent) {
-    elements.recentList.append(createMatchRow(record, true));
+    elements.recentList.append(createMatchRow(record, {
+      includeDate: true,
+      allowRematch: true,
+    }));
   }
 }
 
@@ -465,7 +481,11 @@ function completeMatch() {
   if (!activeMatch || activeMatch.phase !== MATCH_PHASES.GAME_OVER) return;
 
   const record = toHistoryRecord(activeMatch);
-  addHistoryRecord(record);
+  if (!addHistoryRecord(record)) {
+    showToast("Couldn't save match — score kept", 2600);
+    return;
+  }
+
   clearActiveMatch();
   activeMatch = null;
   hideModal();
@@ -535,7 +555,10 @@ function renderHistory() {
     const list = document.createElement("div");
     list.className = "history-group-list";
     for (const record of records) {
-      list.append(createMatchRow(record, false));
+      list.append(createMatchRow(record, {
+        allowRematch: true,
+        allowDelete: true,
+      }));
     }
 
     group.append(heading, list);
@@ -543,7 +566,11 @@ function renderHistory() {
   }
 }
 
-function createMatchRow(record, includeDate) {
+function createMatchRow(record, {
+  includeDate = false,
+  allowRematch = false,
+  allowDelete = false,
+} = {}) {
   const row = document.createElement("article");
   row.className = "match-row";
 
@@ -575,14 +602,94 @@ function createMatchRow(record, includeDate) {
     ? `${formatShortDate(record.endedAt)} · ${time} · ${gameScores}`
     : `${time} · ${gameScores}`;
 
+  main.append(names, detail);
+
+  const actions = document.createElement("div");
+  actions.className = "match-row-actions";
+
+  if (allowRematch && Object.values(MATCH_TYPES).includes(record.type)) {
+    actions.append(createMatchAction("↻ Rematch", () => requestRematch(record)));
+  }
+
+  if (allowDelete) {
+    actions.append(createMatchAction("Delete", () => confirmDeleteHistoryRecord(record), true));
+  }
+
+  if (actions.childElementCount > 0) {
+    main.append(actions);
+  }
+
   const result = document.createElement("div");
   result.className = "match-result";
   result.textContent = `${record.gamesWon.a}–${record.gamesWon.b}`;
   result.setAttribute("aria-label", `${record.gamesWon.a} games to ${record.gamesWon.b}`);
 
-  main.append(names, detail);
   row.append(main, result);
   return row;
+}
+
+function createMatchAction(label, onClick, danger = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `match-row-action${danger ? " danger" : ""}`;
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function requestRematch(record) {
+  const start = () => startRematch(record);
+
+  if (!activeMatch) {
+    start();
+    return;
+  }
+
+  showModal({
+    kicker: "Match in progress",
+    title: "Start this rematch?",
+    copy: "Your current score will be discarded. Completed history stays untouched.",
+    secondaryLabel: "Keep match",
+    primaryLabel: "Start rematch",
+    onSecondary: hideModal,
+    onPrimary: start,
+  });
+}
+
+function startRematch(record) {
+  clearActiveMatch();
+  activeMatch = createMatch({
+    type: record.type,
+    teamAName: record.teams.a.name,
+    teamBName: record.teams.b.name,
+  });
+  saveActiveMatch(activeMatch);
+  hideModal();
+  renderOrientation();
+  showView("orient");
+}
+
+function confirmDeleteHistoryRecord(record) {
+  showModal({
+    kicker: "History",
+    title: "Delete this match?",
+    copy: `${record.teams.a.name} vs ${record.teams.b.name} · ${formatShortDate(record.endedAt)}`,
+    secondaryLabel: "Delete",
+    primaryLabel: "Keep",
+    onSecondary: () => removeHistoryRecord(record.id),
+    onPrimary: hideModal,
+  });
+}
+
+function removeHistoryRecord(recordId) {
+  if (!deleteHistoryRecord(recordId)) {
+    showToast("Couldn't delete match", 2200);
+    return;
+  }
+
+  hideModal();
+  renderHistory();
+  showToast("Match deleted");
 }
 
 function showView(name) {
@@ -598,8 +705,10 @@ function showView(name) {
 
   if (isScoring && !wasScoring) {
     void tryLockLandscape();
+    void requestScreenWakeLock();
   } else if (!isScoring && wasScoring) {
     tryUnlockOrientation();
+    void releaseScreenWakeLock();
     leaveFullscreen();
   }
 
@@ -659,6 +768,57 @@ function updateSetupLabels() {
   elements.teamALabel.textContent = doubles ? "Team A" : "Player A";
   elements.teamBLabel.textContent = doubles ? "Team B" : "Player B";
   elements.doublesHint.hidden = !doubles;
+  renderRecentNameSuggestions(type);
+}
+
+function renderRecentNameSuggestions(type) {
+  const names = getRecentNames(type);
+  renderRecentNameOptions(elements.teamARecent, elements.teamAInput, names);
+  renderRecentNameOptions(elements.teamBRecent, elements.teamBInput, names);
+}
+
+function getRecentNames(type, limit = 4) {
+  const names = [];
+  const seen = new Set();
+
+  for (const record of loadHistory()) {
+    if (record.type !== type) continue;
+
+    for (const team of [record.teams.a, record.teams.b]) {
+      const name = normalizeName(team.name);
+      const key = name.toLocaleLowerCase();
+      if (!name || seen.has(key)) continue;
+
+      seen.add(key);
+      names.push(name);
+      if (names.length >= limit) return names;
+    }
+  }
+
+  return names;
+}
+
+function renderRecentNameOptions(container, input, names) {
+  container.replaceChildren();
+  container.hidden = names.length === 0;
+  if (names.length === 0) return;
+
+  const label = document.createElement("span");
+  label.className = "recent-name-label";
+  label.textContent = "Recent";
+  container.append(label);
+
+  for (const name of names) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "recent-name-chip";
+    button.textContent = name;
+    button.addEventListener("click", () => {
+      input.value = name;
+      input.focus();
+    });
+    container.append(button);
+  }
 }
 
 function showSetupError(message) {
