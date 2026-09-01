@@ -1,4 +1,4 @@
-const CACHE_NAME = "loveall-v4";
+const CACHE_NAME = "loveall-v5";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -11,6 +11,7 @@ const CORE_ASSETS = [
   "./src/haptics.js",
   "./src/effects.js",
   "./src/install.js",
+  "./src/wake-lock.js",
   "./src/scoring-ui.css"
 ];
 
