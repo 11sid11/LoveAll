@@ -22,8 +22,10 @@ export function saveActiveMatch(match) {
 export function clearActiveMatch() {
   try {
     localStorage.removeItem(ACTIVE_MATCH_KEY);
+    return true;
   } catch {
     // Storage can be unavailable in restricted browsing modes. Keep the in-memory session usable.
+    return false;
   }
 }
 
@@ -38,9 +40,24 @@ export function loadHistory() {
 }
 
 export function addHistoryRecord(record) {
+  if (!isUsableHistoryRecord(record)) return false;
+
   const history = loadHistory().filter((item) => item.id !== record.id);
   history.unshift(record);
   return writeJson(HISTORY_KEY, history.slice(0, MAX_HISTORY_ITEMS));
+}
+
+export function deleteHistoryRecord(recordId) {
+  if (typeof recordId !== "string" || !recordId) return false;
+
+  const history = loadHistory();
+  const nextHistory = history.filter((item) => item.id !== recordId);
+
+  if (nextHistory.length === history.length) {
+    return true;
+  }
+
+  return writeJson(HISTORY_KEY, nextHistory);
 }
 
 export function getLocalDateKey(timestamp) {
