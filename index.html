@@ -14,6 +14,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/loveall.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./src/scoring-ui.css">
 </head>
 <body>
   <div class="app-shell" id="app">
@@ -178,7 +179,13 @@
             </button>
           </section>
 
-          <div class="court-divider" aria-hidden="true"><span></span></div>
+          <div class="court-divider">
+            <span class="court-net" aria-hidden="true"></span>
+            <button class="court-swap-button" id="switch-sides" type="button" aria-label="Switch the left and right screen sides">
+              <span class="court-swap-icon" aria-hidden="true">⇄</span>
+              <span class="sr-only">Switch sides</span>
+            </button>
+          </div>
 
           <section class="score-side" id="right-score-side" aria-label="Right half of screen">
             <div class="side-heading">
@@ -207,7 +214,6 @@
           <span class="score-footnote">Tap the side that won the rally</span>
           <div class="score-footer-actions">
             <button class="score-tool" id="undo-button" type="button">↶ <span>Undo</span></button>
-            <button class="switch-button" id="switch-sides" type="button"><span aria-hidden="true">⇄</span> Switch sides</button>
           </div>
         </footer>
 
