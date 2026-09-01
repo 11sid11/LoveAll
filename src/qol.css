@@ -1,0 +1,86 @@
+.name-field {
+  min-width: 0;
+}
+
+.recent-name-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.recent-name-label {
+  margin-right: 2px;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 780;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recent-name-chip,
+.match-row-action {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 130ms var(--ease-out),
+    border-color 130ms ease,
+    background 130ms ease,
+    color 130ms ease;
+}
+
+.recent-name-chip {
+  max-width: 100%;
+  padding: 0 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-name-chip:active,
+.match-row-action:active {
+  transform: scale(0.96);
+}
+
+.match-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.match-row-action {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.match-row-action.danger {
+  color: #dca1a1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .recent-name-chip:hover,
+  .match-row-action:hover {
+    border-color: var(--line-strong);
+    background: rgba(255, 255, 255, 0.045);
+    color: var(--text);
+  }
+
+  .match-row-action.danger:hover {
+    border-color: rgba(255, 133, 133, 0.28);
+    background: rgba(255, 133, 133, 0.06);
+    color: #ffc2c2;
+  }
+}
