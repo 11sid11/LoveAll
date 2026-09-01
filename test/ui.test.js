@@ -5,6 +5,14 @@ import { readFile } from "node:fs/promises";
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
 
+function functionBlock(name, nextName) {
+  const start = app.indexOf(`function ${name}`);
+  const end = nextName ? app.indexOf(`function ${nextName}`, start) : app.length;
+  assert.ok(start >= 0, `${name} exists`);
+  assert.ok(end > start, `${name} block is bounded`);
+  return app.slice(start, end);
+}
+
 test("orientation is expressed as two complete screen layouts", () => {
   for (const id of ["orient-a-left", "orient-a-right", "orient-b-left", "orient-b-right"]) {
     assert.match(html, new RegExp(`id="${id}"`));
@@ -40,15 +48,37 @@ test("the app exposes PWA installation from the top navigation", () => {
   assert.match(app, /setupInstallExperience/);
 });
 
-test("point logging includes energetic feedback hooks", () => {
+test("point logging starts haptic feedback on pointer contact", () => {
+  const bindScoring = functionBlock("bindScoring", "bindReactiveButton");
+  const reactiveButton = functionBlock("bindReactiveButton", "bindModal");
+
+  assert.match(bindScoring, /bindReactiveButton\(elements\.leftAdd, \(\) => haptic\("point"\)\)/);
+  assert.match(bindScoring, /bindReactiveButton\(elements\.rightAdd, \(\) => haptic\("point"\)\)/);
+  assert.match(reactiveButton, /pointerdown/);
+  assert.match(reactiveButton, /onPress\?\.\(\)/);
   assert.match(app, /celebratePoint/);
   assert.match(app, /celebrateGame/);
-  assert.match(app, /haptic\(gameEnded \? "game" : "point"\)/);
 });
 
-test("score footer keeps manual match controls together", () => {
-  assert.match(html, /class="score-footer-actions"/);
-  assert.match(html, /id="undo-button"/);
-  assert.match(html, /id="switch-sides"/);
+test("automatic fullscreen is removed while landscape locking remains best-effort", () => {
+  const completeOrientation = functionBlock("completeOrientation", "handleAddPoint");
+  const showView = functionBlock("showView", "showModal");
+
+  assert.doesNotMatch(completeOrientation, /tryEnterFullscreen/);
+  assert.match(showView, /tryLockLandscape\(\)/);
+  assert.match(showView, /tryUnlockOrientation\(\)/);
+  assert.match(app, /fullscreenButton\.addEventListener/);
+  assert.match(app, /tryEnterFullscreen/);
+});
+
+test("side switching lives in the court divider instead of the bottom toolbar", () => {
+  const dividerStart = html.indexOf('class="court-divider"');
+  const switchStart = html.indexOf('id="switch-sides"');
+  const footerStart = html.indexOf('class="score-footer"');
+
+  assert.ok(dividerStart >= 0, "court divider exists");
+  assert.ok(switchStart > dividerStart, "switch control is inside the central court region");
+  assert.ok(switchStart < footerStart, "switch control appears before the footer");
+  assert.match(html, /class="court-swap-button"/);
   assert.match(html, /LoveAll never flips them automatically/);
 });
